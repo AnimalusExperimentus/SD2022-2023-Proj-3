@@ -82,9 +82,9 @@ int rtree_put(struct rtree_t *rtree, struct entry_t *entry) {
     msg.opcode = MESSAGE_T__OPCODE__OP_PUT;
     msg.c_type = MESSAGE_T__C_TYPE__CT_ENTRY;
 
-    msg.key = malloc(strlen(entry->key));
-    memcpy(msg.key, entry->key, strlen(entry->key));
-    msg.size = strlen(entry->key);
+    msg.key = malloc(strlen(entry->key)+1);
+    memcpy(msg.key, entry->key, strlen(entry->key)+1);
+    msg.size = strlen(entry->key)+1;
     msg.data.len = entry->value->datasize;
     msg.data.data = malloc(entry->value->datasize);
     memcpy(msg.data.data, entry->value->data, entry->value->datasize);
@@ -117,9 +117,10 @@ struct data_t *rtree_get(struct rtree_t *rtree, char *key) {
     msg.opcode = MESSAGE_T__OPCODE__OP_GET;
     msg.c_type = MESSAGE_T__C_TYPE__CT_KEY;
 
-    msg.key = malloc(strlen(key));
-    memcpy(msg.key, key, strlen(key));
-    msg.size = strlen(key);
+    int len = strlen(key)+1;
+    msg.key = malloc(len);
+    memcpy(msg.key, key, len);
+    msg.size = len;
 
     // send msg and receive response
     MessageT *msg_rcv = network_send_receive(rtree, &msg);
@@ -159,9 +160,10 @@ int rtree_del(struct rtree_t *rtree, char *key){
     msg.opcode = MESSAGE_T__OPCODE__OP_DEL;
     msg.c_type = MESSAGE_T__C_TYPE__CT_KEY;
 
-    msg.key = malloc(strlen(key));
-    memcpy(msg.key, key, strlen(key));
-    msg.size = strlen(key);
+    int len = strlen(key)+1;
+    msg.key = malloc(len);
+    memcpy(msg.key, key, len);
+    msg.size = len;
 
     // send msg and receive response
     MessageT *msg_rcv = network_send_receive(rtree, &msg);
@@ -252,7 +254,7 @@ char **rtree_get_keys(struct rtree_t *rtree) {
 
     // copy keys to local array to return
     int size = msg_rcv->n_keys;
-    char **key_arr = malloc(size+1);
+    char **key_arr = malloc(sizeof(char *)*(size+1));
     key_arr[size] = NULL;
     
     for (int i = 0; i < size; i++) {
@@ -287,13 +289,13 @@ void **rtree_get_values(struct rtree_t *rtree) {
 
     // build result array
     int n_values = msg_rcv->n_vals;
-    void **result_arr = malloc(sizeof(struct data_t *)*n_values+1);
+    void  **result_arr = malloc(sizeof(struct data_t *)*(n_values+1));
     result_arr[n_values] = NULL;
     for (int i = 0; i < n_values; i++) {
 
-        struct data_t *d = malloc(sizeof(struct data_t *));
+        struct data_t *d = malloc(sizeof(struct data_t));
         d->datasize = msg_rcv->vals[i]->data.len;
-        d->data = malloc(d->datasize);
+        d->data = malloc((sizeof(uint8_t *))*d->datasize);
         memcpy(d->data, msg_rcv->vals[i]->data.data, d->datasize);
         result_arr[i] = d;
     }

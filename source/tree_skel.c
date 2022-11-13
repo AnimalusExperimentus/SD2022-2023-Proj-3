@@ -67,12 +67,10 @@ int invoke(MessageT *msg) {
 
         case MESSAGE_T__OPCODE__OP_DEL:
 
-            char* key_d = malloc(msg->size+1);
-            memset(key_d, '\0', msg->size+1);
+            char* key_d = malloc(msg->size);
+            memset(key_d, '\0', msg->size);
             memcpy(key_d, msg->key, msg->size);
             
-            printf("%s", key_d);
-
             int i = tree_del(tree, key_d);
             free(key_d);
             if(i == 0) {
@@ -85,8 +83,8 @@ int invoke(MessageT *msg) {
 
         case MESSAGE_T__OPCODE__OP_GET:
 
-            char *key = malloc(msg->size+1);
-            memset(key, '\0', msg->size+1);
+            char *key = malloc(msg->size);
+            memset(key, '\0', msg->size);
             memcpy(key, msg->key, msg->size);
 
             struct data_t *t = tree_get(tree, key);

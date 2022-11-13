@@ -50,8 +50,8 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            struct data_t *d = data_create(strlen(data));
-            memcpy(d->data, data, strlen(data));
+            struct data_t *d = data_create(strlen(data)+1);
+            memcpy(d->data, data, strlen(data)+1);
             struct entry_t *e = entry_create(key, d);
             int r = rtree_put(rtree, e);
             entry_destroy(e);
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             
-            if(rtree_del(rtree,key) == 0) {
+            if(rtree_del(rtree, key) == 0) {
                 printf("Deleted entry for key: %s \n", key);
             }else {
               printf("Key not found or error on delete\n");
@@ -148,6 +148,11 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            // free keys
+            for (int i = 0; keys[i] != NULL; i++)
+                free(keys[i]);
+            free(keys);
+
         //GETVALUES-----------------------------------------------
         } else if (strcmp(command, "getvalues") == 0) {
             if (strtok(NULL, " ") != NULL) {
@@ -166,6 +171,14 @@ int main(int argc, char *argv[]) {
                     printf("%.*s\n", n, (char *)d->data);
                 }
             }
+
+            // free values
+            for (int i = 0; values[i] != NULL; i++) {
+                struct data_t *d = values[i];
+                free(d->data);
+                free(d);
+            }
+            free(values);
         //NOEXIST-----------------------------------------------
         } else {
             printf("That command doesn't exist.\n");

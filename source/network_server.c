@@ -26,7 +26,7 @@ int network_server_init(short port){
     }
 
     int socket_fd;
-    struct sockaddr_in server, optional;
+    struct sockaddr_in server;
 
     if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Something went wrong");
@@ -37,7 +37,8 @@ int network_server_init(short port){
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(port);
 
-    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &optional, sizeof(optional)) < 0) {
+    const int enable = 1;
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
         perror("Something went wrong - SO_REUSEADDR");
         close(socket_fd);
         return -1;
