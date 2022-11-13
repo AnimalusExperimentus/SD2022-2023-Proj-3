@@ -14,6 +14,7 @@
 
 #define SIZE_CLIENT_DEFAULT 1024
 int sckt;
+int last_assigned=0;//sempre que um put or delete ocorre e incrementado usado para op_n dos request
 
 /* Função para preparar uma socket de receção de pedidos de ligação
  * num determinado porto.

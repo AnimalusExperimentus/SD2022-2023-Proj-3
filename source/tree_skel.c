@@ -188,6 +188,9 @@ int invoke(MessageT *msg) {
                 msg->c_type=MESSAGE_T__C_TYPE__CT_NONE;
             }
             return 0;
+
+        case MESSAGE_T__OPCODE__OP_VERIFY:
+            return 0;
             
         // so compiler doesn't scream at us
         case MESSAGE_T__OPCODE__OP_BAD:
