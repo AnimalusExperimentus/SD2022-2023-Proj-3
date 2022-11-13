@@ -10,12 +10,16 @@
 #include "../include/tree_skel.h"
 #include "../include/data.h"
 #include "../include/entry.h"
+#include "../include/request.h"
+
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 struct tree_t *tree;
+struct request_t *queue_head;
+
 
 
 /* Inicia o skeleton da árvore.

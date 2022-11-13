@@ -30,6 +30,7 @@ typedef enum _MessageT__Opcode {
   MESSAGE_T__OPCODE__OP_PUT = 50,
   MESSAGE_T__OPCODE__OP_GETKEYS = 60,
   MESSAGE_T__OPCODE__OP_GETVALUES = 70,
+  MESSAGE_T__OPCODE__OP_VERIFY = 80,
   MESSAGE_T__OPCODE__OP_ERROR = 99
     PROTOBUF_C__FORCE_ENUM_TO_BE_INT_SIZE(MESSAGE_T__OPCODE)
 } MessageT__Opcode;
@@ -69,10 +70,11 @@ struct  _MessageT
   char **keys;
   size_t n_vals;
   MessageT__Value **vals;
+  int32_t op_n;
 };
 #define MESSAGE_T__INIT \
  { PROTOBUF_C_MESSAGE_INIT (&message_t__descriptor) \
-    , MESSAGE_T__OPCODE__OP_BAD, MESSAGE_T__C_TYPE__CT_BAD, (char *)protobuf_c_empty_string, 0, {0,NULL}, 0,NULL, 0,NULL }
+    , MESSAGE_T__OPCODE__OP_BAD, MESSAGE_T__C_TYPE__CT_BAD, (char *)protobuf_c_empty_string, 0, {0,NULL}, 0,NULL, 0,NULL, 0 }
 
 
 /* MessageT__Value methods */
