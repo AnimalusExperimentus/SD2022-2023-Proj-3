@@ -180,6 +180,22 @@ int main(int argc, char *argv[]) {
             }
             free(values);
         //NOEXIST-----------------------------------------------
+        }   else if (strcmp(command, "getvalues") == 0){
+            int op_n=strtok(NULL, " ");
+            if (op_n==NULL||strtok(NULL, " ") != NULL) {
+                printf("syntax: verify <op_n>\n");
+                printf("\n> ");
+                continue;
+            }
+
+            int exist=rtree_verify(rtree,op_n);
+
+            if (exist == -1) {
+                perror("Error on size\n");
+                exit(-1);
+            }
+            printf("Operation is currently %i\n", exist);
+        
         } else {
             printf("That command doesn't exist.\n");
         }
