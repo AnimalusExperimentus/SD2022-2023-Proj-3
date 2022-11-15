@@ -11,15 +11,26 @@
 #include "../include/data.h"
 #include "../include/entry.h"
 #include "../include/request.h"
+#include "../include/op_proc.h"
+#include "../include/request_line.h"
 
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
+
 
 struct tree_t *tree;
-struct request_t *queue_head;
+struct task_t *queue_head;
 int last_assigned=0;//sempre que um put or delete ocorre e incrementado usado para op_n dos request
+pthread_t thread[];
+
+struct op_proc *proc;
+
+
 
 
 
@@ -28,12 +39,30 @@ int last_assigned=0;//sempre que um put or delete ocorre e incrementado usado pa
  * função invoke(). 
  * Retorna 0 (OK) ou -1 (erro, por exemplo OUT OF MEMORY)
  */
-int tree_skel_init() {
+int tree_skel_init(int N) {
+    thread[N];
+    pthread_t thread[N];
+	int thread_param[N];
+    
    
    tree = tree_create();
     if(tree == NULL) {
         return -1;
     }
+
+    for (int i=0; i < N; i++){
+		/* criação de nova thread */
+		thread_param[i] = i+1;
+		if (pthread_create(&thread[i], NULL, &process_request, (void *) &thread_param[i]) != 0){
+			printf("\nThread %d não criada.\n", i);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+    proc = malloc(sizeof(struct op_proc));
+
+
+
     return 0;
 }
 
@@ -190,9 +219,11 @@ int invoke(MessageT *msg) {
             }
             return 0;
 
-        case MESSAGE_T__OPCODE__OP_VERIFY:
+        case MESSAGE_T__OPCODE__OP_VERIFY://first looks at max_proc to find if completed or not then looks at in_progress to find if it exists
             return 0;
             
+
+
         // so compiler doesn't scream at us
         case MESSAGE_T__OPCODE__OP_BAD:
             return 0;
