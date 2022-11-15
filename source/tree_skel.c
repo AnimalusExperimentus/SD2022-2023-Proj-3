@@ -25,8 +25,10 @@
 
 struct tree_t *tree;
 struct task_t *queue_head;
-int last_assigned=0;//sempre que um put or delete ocorre e incrementado usado para op_n dos request
+int last_assigned=1;//sempre que um put or delete ocorre e incrementado usado para op_n dos request
 pthread_t thread[];
+int thread_param[];
+int thread_num;
 
 struct op_proc *proc;
 
@@ -41,8 +43,8 @@ struct op_proc *proc;
  */
 int tree_skel_init(int N) {
     thread[N];
-    pthread_t thread[N];
 	int thread_param[N];
+    thread_num=N;
     
    
    tree = tree_create();
@@ -60,6 +62,16 @@ int tree_skel_init(int N) {
 	}
 
     proc = malloc(sizeof(struct op_proc));
+    proc->in_progress=malloc((sizeof(int))*N);
+    if(proc==NULL){
+        free(proc->in_progress);
+        free(proc);
+    }
+
+
+    for(int i=0;i<N;i++){
+        proc->in_progress[i]=0;
+    }
 
 
 
@@ -69,10 +81,24 @@ int tree_skel_init(int N) {
 /* Liberta toda a memória e recursos alocados pela função tree_skel_init.
  */
 void tree_skel_destroy() {
+    task_t *task;
     
     if(tree != NULL) {
         tree_destroy(tree);
     }
+
+    if(queue_head!=NULL){
+        while(queue_head->next!=NULL){
+            free(queue_head->request->key);
+            data_destroy(queue_head->request->data);
+            free(queue_head->request);
+            task=queue_head->next;
+            free(queue_head);
+            queue_head=task;
+        }
+    }
+
+
 }
 
 /* Executa uma operação na árvore (indicada pelo opcode contido em msg)
