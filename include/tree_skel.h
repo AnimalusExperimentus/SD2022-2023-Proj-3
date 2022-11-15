@@ -16,7 +16,7 @@
  * função invoke(). 
  * Retorna 0 (OK) ou -1 (erro, por exemplo OUT OF MEMORY)
  */
-int tree_skel_init();
+int tree_skel_init(int N);
 
 /* Liberta toda a memória e recursos alocados pela função tree_skel_init.
  */
@@ -27,5 +27,11 @@ void tree_skel_destroy();
  * Retorna 0 (OK) ou -1 (erro, por exemplo, árvore nao incializada)
 */
 int invoke(MessageT *msg);
+
+
+
+/* Função da thread secundária que vai processar pedidos de escrita.
+*/
+void * process_request (void *params);
 
 #endif

@@ -30,7 +30,14 @@ int main(int argc, char *argv[]) {
         exit(-1);
     }
 
-    tree_skel_init();
+
+    int thread_number;
+    if(sscanf(argv[2], "%i", &thread_number) != 1) {
+        printf("Port must be an integer\n");
+        exit(-1);
+    }
+    tree_skel_init(thread_number);
+
 
     int result = network_main_loop(listening_socket);
     

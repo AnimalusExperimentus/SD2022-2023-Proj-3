@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "request.h": "c",
-        "network-private.h": "c"
+        "network-private.h": "c",
+        "request_line.h": "c",
+        "unistd.h": "c"
     }
 }
