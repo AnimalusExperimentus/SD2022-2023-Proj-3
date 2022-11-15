@@ -19,6 +19,7 @@
 
 struct tree_t *tree;
 struct request_t *queue_head;
+int last_assigned=0;//sempre que um put or delete ocorre e incrementado usado para op_n dos request
 
 
 

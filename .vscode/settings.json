@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "request.h": "c"
+        "request.h": "c",
+        "network-private.h": "c"
     }
 }

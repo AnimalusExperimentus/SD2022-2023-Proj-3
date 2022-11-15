@@ -9,12 +9,16 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <stdbool.h>
+#include <poll.h>
 #include "../include/tree_skel.h"
 #include "../include/network-private.h"
 
 #define SIZE_CLIENT_DEFAULT 1024
 int sckt;
-int last_assigned=0;//sempre que um put or delete ocorre e incrementado usado para op_n dos request
+
+#define NFDESC 4 
+#define TIMEOUT 50 
+
 
 /* Função para preparar uma socket de receção de pedidos de ligação
  * num determinado porto.
@@ -152,7 +156,53 @@ int network_server_close() {
  * - Enviar a resposta ao cliente usando a função network_send.
  */
 int network_main_loop(int listening_socket) {
+    struct sockaddr client;
+    int client_socket;
+    socklen_t size_client = SIZE_CLIENT_DEFAULT;
+    struct pollfd connections[NFDESC];
+    int nfds, kfds;
     
+
+
+    if (listening_socket < 0) {
+        perror("Listening socket is invalid");
+        return -1;
+    }
+    sckt = listening_socket;
+
+
+    for (int i = 0; i < NFDESC; i++){
+        connections[i].fd = -1;    // poll ignora estruturas com fd < 0
+
+        connections[0].fd = client_socket;  // Vamos detetar eventos na welcoming socket
+        connections[0].events = POLLIN;  // Vamos esperar liga��es nesta socket
+
+    nfds = 1; // n�mero de file descriptors
+    }
+
+    while (kfds=poll(connections,nfds,TIMEOUT >= 0)) { /* Espera por dados nos sockets abertos */
+        if ((connections[0].revents & POLLIN) && (nfds < NFDESC)) { /* Verifica se tem novo pedido de conexão */
+           if ((connections[nfds].fd = accept(connections[0].fd, (struct sockaddr *) &client, &size_client)) > 0){ // Liga��o feita ?
+            connections[nfds].events = POLLIN; // Vamos esperar dados nesta socket
+            nfds++;
+      }}
+        for (int i=1;i<nfds;i++) { /* Verifica restantes sockets */
+            if (connections[i].revents & POLLIN) {
+                    MessageT *messageT = network_receive(connections[i].fd);
+                if (messageT ==NULL) { /* Sinal de que a conexão foi fechada pelo cliente */
+                    close(connections[i].fd);
+                    connections[i].fd=-1;
+                } else {
+                    invoke(messageT); /* Executa pedido contido em message */
+                    network_send(connections[i].fd,messageT); /* Envia resposta contida em message */
+                    }}
+                if (connections[i].revents & POLLHUP) {
+                    close(connections[i].fd);
+                    connections[i].fd=-1;
+                    }}}
+
+
+    /*
     struct sockaddr client;
     int client_socket;
     socklen_t size_client = SIZE_CLIENT_DEFAULT;
@@ -188,6 +238,7 @@ int network_main_loop(int listening_socket) {
                 network_send(client_socket, messageT);
             }
         }
-    }
+    }*/
     return 0;
+
 }
