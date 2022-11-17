@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 
             printf("Tree height is currently %i\n", r);
 
-        //KEYS----------------------------------------------------
+        //KEYS ----------------------------------------------------
         } else if (strcmp(command, "getkeys") == 0) {
             if (strtok(NULL, " ") != NULL){
                 printf("syntax: getkeys \n");
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
                 free(keys[i]);
             free(keys);
 
-        //GETVALUES-----------------------------------------------
+        //GETVALUES -----------------------------------------------
         } else if (strcmp(command, "getvalues") == 0) {
             if (strtok(NULL, " ") != NULL) {
                 printf("syntax: getvalues <key>\n");
@@ -179,16 +179,18 @@ int main(int argc, char *argv[]) {
                 free(d);
             }
             free(values);
-        //NOEXIST-----------------------------------------------
-        }   else if (strcmp(command, "getvalues") == 0){
-            int op_n=strtok(NULL, " ");
-            if (op_n==NULL||strtok(NULL, " ") != NULL) {
+        //VERIFY -----------------------------------------------
+        } else if (strcmp(command, "verify") == 0) {
+            char* op_n = strtok(NULL, " \n");
+            if (op_n == NULL || strtok(NULL, " ") != NULL) {
                 printf("syntax: verify <op_n>\n");
                 printf("\n> ");
                 continue;
             }
 
-            int exist=rtree_verify(rtree,op_n);
+            int i_op_n;
+            sscanf(op_n, "%d", &i_op_n);
+            int exist = rtree_verify(rtree, i_op_n);
 
             if (exist == -1) {
                 perror("Error on size\n");

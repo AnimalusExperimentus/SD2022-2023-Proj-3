@@ -305,25 +305,27 @@ void **rtree_get_values(struct rtree_t *rtree) {
 }
 
 
-int rtree_verify(struct rtree_t *rtree,int op_n){
+/* Verifica se a operacao identificada por op_n foi executada
+*/
+int rtree_verify(struct rtree_t *rtree, int op_n) {
 
     MessageT msg = MESSAGE_T__INIT;
     msg.opcode = MESSAGE_T__OPCODE__OP_VERIFY;
     msg.c_type = MESSAGE_T__C_TYPE__CT_RESULT;
-    msg.op_n=op_n;
+    msg.op_n = op_n;
 
     MessageT *msg_rcv = network_send_receive(rtree, &msg);
     if (msg_rcv == NULL) {
         message_t__free_unpacked(msg_rcv, NULL);
-        return NULL;
+        return  -1;
     }
 
     if (msg_rcv->opcode == MESSAGE_T__OPCODE__OP_ERROR) {
         message_t__free_unpacked(msg_rcv, NULL);
-        return NULL;
+        return -1;
     }
 
-    int exist=msg_rcv->op_n;
-    message_t__free_unpacked(msg_rcv,NULL);
+    int exist = msg_rcv->op_n;
+    message_t__free_unpacked(msg_rcv, NULL);
     return exist;
 }

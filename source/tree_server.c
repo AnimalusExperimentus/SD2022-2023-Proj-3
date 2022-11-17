@@ -14,8 +14,8 @@
 
 int main(int argc, char *argv[]) {
 
-    if (argc != 2) {
-        printf("Server takes 1 argument: port\n");
+    if (argc != 3) {
+        printf("Server takes 2 arguments: port number_threads\n");
         exit(-1);
     }
     int port;
@@ -23,21 +23,22 @@ int main(int argc, char *argv[]) {
         printf("Port must be an integer\n");
         exit(-1);
     }
+    int thread_number;
+    if(sscanf(argv[2], "%i", &thread_number) != 1) {
+        printf("Number_threads must be an integer\n");
+        exit(-1);
+    }
 
     int listening_socket = network_server_init((short)port);
     if (listening_socket == -1) {
-        printf("socket creation error\n");
+        printf("Socket creation error\n");
         exit(-1);
     }
 
-
-    int thread_number;
-    if(sscanf(argv[2], "%i", &thread_number) != 1) {
-        printf("Port must be an integer\n");
+    if (tree_skel_init(thread_number) != 0) {
+        printf("Tree initialization error\n");
         exit(-1);
     }
-    tree_skel_init(thread_number);
-
 
     int result = network_main_loop(listening_socket);
     
