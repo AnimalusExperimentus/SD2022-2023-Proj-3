@@ -28,10 +28,12 @@ void tree_skel_destroy();
 */
 int invoke(MessageT *msg);
 
-
-
 /* Função da thread secundária que vai processar pedidos de escrita.
 */
 void * process_request (void *params);
+
+/* Verifica se a operacao identificada por op_n foi executada.
+*/
+int verify(int op_n);
 
 #endif

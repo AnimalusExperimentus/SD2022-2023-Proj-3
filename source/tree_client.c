@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
                 printf("Value found for this key: %.*s\n", d->datasize, (char*)d->data);
             }
 
-        //DEL-----------------------------------------------------
+        // DEL-----------------------------------------------------
         } else if (strcmp(command, "del") == 0) {
             char* key = strtok(NULL, " \n");
             if (key == NULL || strtok(NULL, " ") != NULL){
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 
             printf("Tree height is currently %i\n", r);
 
-        //KEYS ----------------------------------------------------
+        // GETKEYS ----------------------------------------------------
         } else if (strcmp(command, "getkeys") == 0) {
             if (strtok(NULL, " ") != NULL){
                 printf("syntax: getkeys \n");
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
                 free(keys[i]);
             free(keys);
 
-        //GETVALUES -----------------------------------------------
+        // GETVALUES -----------------------------------------------
         } else if (strcmp(command, "getvalues") == 0) {
             if (strtok(NULL, " ") != NULL) {
                 printf("syntax: getvalues <key>\n");
@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
                 free(d);
             }
             free(values);
-        //VERIFY -----------------------------------------------
+        // VERIFY -----------------------------------------------
         } else if (strcmp(command, "verify") == 0) {
             char* op_n = strtok(NULL, " \n");
             if (op_n == NULL || strtok(NULL, " ") != NULL) {

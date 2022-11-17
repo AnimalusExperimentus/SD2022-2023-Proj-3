@@ -31,20 +31,27 @@ int network_connect(struct rtree_t *rtree) {
     // create socket and save in rtree
     rtree->sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (rtree->sockfd < 0) {
-        perror("Error - socket creation");
+        perror("Error - socket creation\n");
         return -1;
     }
 
     // open connection to server
     if (connect(rtree->sockfd, (const struct sockaddr *) &rtree->server, sizeof(rtree->server)) < 0) {
-        perror("Error - connect opening");
+        perror("Error - connect opening\n");
         close(rtree->sockfd);
         return -1;
     }
 
-    // send hello packet
+    // exchange hello packet
     char buf[1] = "1";
     write(rtree->sockfd, buf, 1);
+    int r = read(rtree->sockfd, buf, 1);
+
+    if (r <= 0) {
+        perror("Server has reached the maximum number of clients connected\n");
+        close(rtree->sockfd);
+        return -1;
+    }
 
     return 0;
 }

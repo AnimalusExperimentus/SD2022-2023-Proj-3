@@ -14,11 +14,10 @@
 #include "../include/network-private.h"
 
 #define SIZE_CLIENT_DEFAULT 1024
-#define NFDESC 4 
+#define NFDESC 1024 // accept atmost NFDESC clients at the same time
 #define TIMEOUT 50 
 
 int sckt;
-
 
 /* Função para preparar uma socket de receção de pedidos de ligação
  * num determinado porto.
@@ -61,6 +60,7 @@ int network_server_init(short port){
         return -1;
     }
 
+    sckt = socket_fd;
     return socket_fd;
 }
 
@@ -147,6 +147,19 @@ int network_server_close() {
 }
 
 
+/* Aux function*/
+int get_nfds(struct pollfd *connections) {
+
+    int nfds = 1;
+    for (nfds = 1; nfds < NFDESC; nfds++) {
+        if (connections[nfds].fd == -1) {
+            return nfds;
+        }
+    }
+    return -1;
+}
+
+
 /* Esta função deve:
  * - Aceitar uma conexão de um cliente;
  * - Receber uma mensagem usando a função network_receive;
@@ -166,7 +179,7 @@ int network_main_loop(int listening_socket) {
     }
 
     // make poll ignore other sockets
-    for (int i = 0; i < NFDESC; i++) { connections[i].fd = -1; }
+    for (int i = 1; i < NFDESC; i++) { connections[i].fd = -1; }
 
     // init welcoming socket for poll
     connections[0].fd = listening_socket;
@@ -176,29 +189,35 @@ int network_main_loop(int listening_socket) {
     nfds = 1;
 
     // wait for data on open sockets
-    while ( (kfds = poll(connections, nfds, TIMEOUT)) >= 0) {
-    if (kfds > 0 ) {
+    while ( (kfds = poll(connections, NFDESC, TIMEOUT)) >= 0) {
+    if (kfds > 0) {
 
         // Do we have a new connection request
-        if ((connections[0].revents & POLLIN) && (nfds < NFDESC)) { 
+        if ((connections[0].revents & POLLIN) && (nfds != -1)) { 
            if ((connections[nfds].fd = accept(connections[0].fd, (struct sockaddr *) &client, &size_client)) > 0) {
-                // read hello packet
-                char buf[1];
+                // exchange hello packet
+                char buf[1] = "1";
                 read(connections[nfds].fd, buf, 1);
+                write(connections[nfds].fd, buf, 1);
                 
-                // wait for data on this connection
+                // set bitflag on connection for data
                 connections[nfds].events = POLLIN; 
-                nfds++;
                 printf("Client connected!\n");
+                
+                nfds = get_nfds(connections);
             } else {
                 perror("Error accepting client connection\n");
                 return -1;
             }
+        // refuse connection if max nr clients reached
+        } else if ((connections[0].revents & POLLIN) && (nfds == -1)) {
+            close(accept(connections[0].fd, (struct sockaddr *) &client, &size_client));
         }
         // Check the remaining sockets
-        for (int i = 1; i < nfds; i++) { 
+        for (int i = 1; i < NFDESC; i++) {
+            if (connections[i].fd == -1) {continue;}
             if (connections[i].revents & POLLIN) {
-                // receive message
+
                 MessageT *messageT = network_receive(connections[i].fd);
                 if (messageT == NULL) {
                     close(connections[i].fd);
@@ -214,46 +233,9 @@ int network_main_loop(int listening_socket) {
                 connections[i].fd = -1;
             }
         }
+        // update nfds if max nr clients reached
+        if (nfds == -1) { nfds = get_nfds(connections); }
     }}
-
-
-    /*
-    struct sockaddr client;
-    int client_socket;
-    socklen_t size_client = SIZE_CLIENT_DEFAULT;
-
-    if (listening_socket < 0) {
-        perror("Listening socket is invalid");
-        return -1;
-    }
-    sckt = listening_socket;
-
-    while(true) {
-
-        client_socket = accept(listening_socket, &client, &size_client);
-        if (client_socket == -1) {
-            perror("Error accepting client connection\n");
-            return -1;
-        }
-        
-        printf("Client connected!\n");
-
-        // read hello packet
-        char buf[1];
-        read(client_socket, buf, 1);
-
-        while(true) {
-            MessageT *messageT = network_receive(client_socket);
-            
-            if (messageT == NULL) {
-                close(client_socket);
-                break;
-            } else {
-                invoke(messageT);
-                network_send(client_socket, messageT);
-            }
-        }
-    }*/
-
+    printf("return: %i\n", kfds);
     return 0;
 }

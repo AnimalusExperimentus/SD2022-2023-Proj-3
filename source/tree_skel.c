@@ -21,7 +21,7 @@ struct op_proc {
     // ops de escrita a serem atendidas pelos threads neste momento
     int *in_progress;
 };
-struct op_proc *proc_op;
+// struct op_proc *proc_op;
 
 struct request_t {
     int op_n;            //o número da operação
@@ -51,6 +51,7 @@ int thread_num;
 
 /**/
 void queue_add_task(struct task_t *task) {
+
     pthread_mutex_lock(&queue_lock);
     if(queue_head==NULL) { /* Adiciona na cabeça da fila */
         queue_head = task; task->next=NULL;
@@ -66,6 +67,7 @@ void queue_add_task(struct task_t *task) {
 
 /**/
 struct task_t *queue_get_task() {
+
     pthread_mutex_lock(&queue_lock);
     while(queue_head==NULL)
         pthread_cond_wait(&queue_not_empty, &queue_lock); /* Espera haver algo */
@@ -78,9 +80,18 @@ struct task_t *queue_get_task() {
 /**/
 void *process_request (void *params) {
     // TODO
-    // printf("test\n");
     return NULL;
 }
+
+
+/* Verifica se a operacao identificada por op_n foi executada.
+*/
+int verify(int op_n) {
+
+    //TODO
+    return 0;
+}
+
 
 /* Inicia o skeleton da árvore.
  * O main() do servidor deve chamar esta função antes de poder usar a
@@ -124,24 +135,22 @@ int tree_skel_init(int N) {
 /* Liberta toda a memória e recursos alocados pela função tree_skel_init.
  */
 void tree_skel_destroy() {
-    // task_t *task;
+    struct task_t *task;
     
     if(tree != NULL) {
         tree_destroy(tree);
     }
 
-    // if(queue_head!=NULL){
-    //     while(queue_head->next!=NULL){
-    //         free(queue_head->request->key);
-    //         data_destroy(queue_head->request->data);
-    //         free(queue_head->request);
-    //         task=queue_head->next;
-    //         free(queue_head);
-    //         queue_head=task;
-    //     }
-    // }
-
-
+    if(queue_head != NULL) {
+        while(queue_head->next != NULL) {
+            free(queue_head->request->key);
+            data_destroy(queue_head->request->data);
+            free(queue_head->request);
+            task=queue_head->next;
+            free(queue_head);
+            queue_head=task;
+        }
+    }
 }
 
 /* Executa uma operação na árvore (indicada pelo opcode contido em msg)
@@ -170,19 +179,22 @@ int invoke(MessageT *msg) {
         }
         case MESSAGE_T__OPCODE__OP_DEL:
         {
+            int opnumber = last_assigned;
+            last_assigned++;
 
-            char* key_d = malloc(msg->size);
-            memset(key_d, '\0', msg->size);
-            memcpy(key_d, msg->key, msg->size);
+            // char* key_d = malloc(msg->size);
+            // memset(key_d, '\0', msg->size);
+            // memcpy(key_d, msg->key, msg->size);
             
-            int i = tree_del(tree, key_d);
-            free(key_d);
-            if(i == 0) {
+            // int i = tree_del(tree, key_d);
+            // free(key_d);
+            // if(i == 0) {
                 msg->opcode=MESSAGE_T__OPCODE__OP_DEL+1;
-            }else {
-                msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
-            }
-            msg->c_type=MESSAGE_T__C_TYPE__CT_NONE;
+            // }else {
+                // msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
+            // }
+            msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
+            msg->op_n=opnumber;
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_GET:
@@ -214,21 +226,25 @@ int invoke(MessageT *msg) {
         }
         case MESSAGE_T__OPCODE__OP_PUT:
         {
-            struct data_t *new_data = data_create((int)msg->data.len);
-            memcpy(new_data->data, msg->data.data, msg->data.len);
-            char* temp_key = malloc(msg->size);
-            memcpy(temp_key, msg->key, msg->size);
-            
-            int r = tree_put(tree, temp_key, new_data);
-            data_destroy(new_data);
-            free(temp_key);
+            int opnumber = last_assigned;
+            last_assigned++;
 
-            if(r == 0){
+            // struct data_t *new_data = data_create((int)msg->data.len);
+            // memcpy(new_data->data, msg->data.data, msg->data.len);
+            // char* temp_key = malloc(msg->size);
+            // memcpy(temp_key, msg->key, msg->size);
+            
+            // int r = tree_put(tree, temp_key, new_data);
+            // data_destroy(new_data);
+            // free(temp_key);
+
+            // if(r == 0){
                 msg->opcode=MESSAGE_T__OPCODE__OP_PUT+1;
-            }else{
-                msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
-            }
-            msg->c_type=MESSAGE_T__C_TYPE__CT_NONE;
+            // }else{
+                // msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
+            // }
+            msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
+            msg->op_n=opnumber;
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_GETKEYS:
