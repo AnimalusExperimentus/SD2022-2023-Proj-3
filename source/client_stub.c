@@ -102,8 +102,10 @@ int rtree_put(struct rtree_t *rtree, struct entry_t *entry) {
         return -1;
     }
     
+
+    int op_n = msg_rcv->op_n;
     message_t__free_unpacked(msg_rcv, NULL);
-    return 0;
+    return op_n;
 }
 
 
@@ -178,8 +180,9 @@ int rtree_del(struct rtree_t *rtree, char *key){
         return -1;
     }
 
+    int op_n = msg_rcv->op_n;
     message_t__free_unpacked(msg_rcv, NULL);
-    return 0;
+    return op_n;
  }
 
 
@@ -322,10 +325,10 @@ int rtree_verify(struct rtree_t *rtree, int op_n) {
 
     if (msg_rcv->opcode == MESSAGE_T__OPCODE__OP_ERROR) {
         message_t__free_unpacked(msg_rcv, NULL);
-        return -1;
+        return -2;
     }
 
-    int exist = msg_rcv->op_n;
+    int r = msg_rcv->op_n;
     message_t__free_unpacked(msg_rcv, NULL);
-    return exist;
+    return r;
 }

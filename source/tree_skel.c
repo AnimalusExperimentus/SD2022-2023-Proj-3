@@ -21,23 +21,16 @@ struct op_proc {
     // ops de escrita a serem atendidas pelos threads neste momento
     int *in_progress;
 };
-// struct op_proc *proc_op;
+struct op_proc *proc_op;
 
 struct request_t {
     int op_n;            //o número da operação
     int op;              //a operação a executar. op=0 se for um delete, op=1 se for um put
     char* key;           //a chave a remover ou adicionar
     struct data_t *data; // os dados a adicionar em caso de put, ou NULL em caso de delete
+    struct request_t *next;
 };
-
-struct task_t {
-    struct request_t *request;
-    struct task_t *next;
-};
-struct task_t *queue_head;
-
-pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER; 
-pthread_cond_t queue_not_empty = PTHREAD_COND_INITIALIZER;
+struct request_t *queue_head;
 
 struct tree_t *tree;
 // sempre que eh recebido pedido de escrita o main thread responde com o valor atual de
@@ -47,37 +40,47 @@ int last_assigned = 1;
 pthread_t *threads;
 int *thread_params;
 int thread_num;
+pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER; 
+pthread_cond_t queue_not_empty = PTHREAD_COND_INITIALIZER;
 
 
 /**/
-void queue_add_task(struct task_t *task) {
+void queue_add_request(struct request_t *request) {
 
     pthread_mutex_lock(&queue_lock);
-    if(queue_head==NULL) { /* Adiciona na cabeça da fila */
-        queue_head = task; task->next=NULL;
-    } else { /* Adiciona no fim da fila */
-        struct task_t *tptr = queue_head;
-        while(tptr->next != NULL) tptr=tptr->next;
-        tptr->next=task; task->next=NULL;
+    request->next = NULL;
+    // adds to head of FIFO
+    if(queue_head == NULL) {
+        queue_head = request;
+    // adds to end of FIFO
+    } else { 
+        struct request_t *tptr = queue_head;
+        while(tptr->next != NULL) {tptr = tptr->next;}
+        tptr->next = request;
     }
-    pthread_cond_signal(&queue_not_empty); /* Avisa um bloqueado nessa condição */
+    pthread_cond_signal(&queue_not_empty);
     pthread_mutex_unlock(&queue_lock);
 }
 
 
 /**/
-struct task_t *queue_get_task() {
+struct request_t *queue_get_request() {
 
     pthread_mutex_lock(&queue_lock);
-    while(queue_head==NULL)
-        pthread_cond_wait(&queue_not_empty, &queue_lock); /* Espera haver algo */
-    struct task_t *task = queue_head; queue_head = task->next;
+    while(queue_head == NULL) {
+        // wait for something
+        pthread_cond_wait(&queue_not_empty, &queue_lock);
+    }
+    struct request_t *request = queue_head;
+    queue_head = request->next;
     pthread_mutex_unlock(&queue_lock);
-    return task;
+    
+    return request;
 }
 
 
-/**/
+/* Funcao da thread secundaria que vai processar pedidos de escrita
+*/
 void *process_request (void *params) {
     // TODO
     return NULL;
@@ -88,14 +91,20 @@ void *process_request (void *params) {
 */
 int verify(int op_n) {
 
-    //TODO
-    return 0;
+    if (op_n <= proc_op->max_proc) { return 0; } 
+    for (int i = 0; i < thread_num; i++)
+    {
+        if (proc_op->in_progress[i] == op_n) { return 1; }
+    }
+    return -2;
 }
 
 
 /* Inicia o skeleton da árvore.
  * O main() do servidor deve chamar esta função antes de poder usar a
- * função invoke(). 
+ * função invoke().
+ * A funcao deve lancar N threads secundarias responsaveis por atender
+ * pedidos de escrita na arvore;
  * Retorna 0 (OK) ou -1 (erro, por exemplo OUT OF MEMORY)
  */
 int tree_skel_init(int N) {
@@ -114,6 +123,7 @@ int tree_skel_init(int N) {
         free(proc_op);
         return(-1);
     }
+    proc_op->max_proc = 0;
     for(int i = 0; i < N; i++) { proc_op->in_progress[i] = 0; }
 
     // init threads
@@ -135,7 +145,7 @@ int tree_skel_init(int N) {
 /* Liberta toda a memória e recursos alocados pela função tree_skel_init.
  */
 void tree_skel_destroy() {
-    struct task_t *task;
+    struct request_t *req;
     
     if(tree != NULL) {
         tree_destroy(tree);
@@ -143,12 +153,12 @@ void tree_skel_destroy() {
 
     if(queue_head != NULL) {
         while(queue_head->next != NULL) {
-            free(queue_head->request->key);
-            data_destroy(queue_head->request->data);
-            free(queue_head->request);
-            task=queue_head->next;
+            free(queue_head->key);
+            data_destroy(queue_head->data);
             free(queue_head);
-            queue_head=task;
+            req=queue_head->next;
+            free(queue_head);
+            queue_head=req;
         }
     }
 }
@@ -181,18 +191,19 @@ int invoke(MessageT *msg) {
         {
             int opnumber = last_assigned;
             last_assigned++;
-
-            // char* key_d = malloc(msg->size);
-            // memset(key_d, '\0', msg->size);
-            // memcpy(key_d, msg->key, msg->size);
             
-            // int i = tree_del(tree, key_d);
-            // free(key_d);
-            // if(i == 0) {
-                msg->opcode=MESSAGE_T__OPCODE__OP_DEL+1;
-            // }else {
-                // msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
-            // }
+            char* key_d = malloc(msg->size);
+            memset(key_d, '\0', msg->size);
+            memcpy(key_d, msg->key, msg->size);
+
+            struct request_t *req;
+            req = malloc(sizeof(struct request_t));
+            req->op_n = opnumber;
+            req->op = 0;
+            req->key = key_d;
+
+            queue_add_request(req);
+            msg->opcode=MESSAGE_T__OPCODE__OP_DEL+1;
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
             msg->op_n=opnumber;
             return 0;
@@ -229,20 +240,20 @@ int invoke(MessageT *msg) {
             int opnumber = last_assigned;
             last_assigned++;
 
-            // struct data_t *new_data = data_create((int)msg->data.len);
-            // memcpy(new_data->data, msg->data.data, msg->data.len);
-            // char* temp_key = malloc(msg->size);
-            // memcpy(temp_key, msg->key, msg->size);
+            struct data_t *new_data = data_create((int)msg->data.len);
+            memcpy(new_data->data, msg->data.data, msg->data.len);
+            char* temp_key = malloc(msg->size);
+            memcpy(temp_key, msg->key, msg->size);
             
-            // int r = tree_put(tree, temp_key, new_data);
-            // data_destroy(new_data);
-            // free(temp_key);
+            struct request_t *req;
+            req = malloc(sizeof(struct request_t));
+            req->op_n = opnumber;
+            req->op = 1;
+            req->key = temp_key;
+            req->data = new_data;
 
-            // if(r == 0){
-                msg->opcode=MESSAGE_T__OPCODE__OP_PUT+1;
-            // }else{
-                // msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
-            // }
+            queue_add_request(req);
+            msg->opcode=MESSAGE_T__OPCODE__OP_PUT+1;
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
             msg->op_n=opnumber;
             return 0;
@@ -305,10 +316,18 @@ int invoke(MessageT *msg) {
             }
             return 0;
         }
-        //first looks at max_proc to find if completed or not then looks at in_progress to find if it exists
         case MESSAGE_T__OPCODE__OP_VERIFY:
         {
-            // TODO
+            int r = verify(msg->op_n);
+            if (r == 0 || r == 1) {
+                msg->opcode=MESSAGE_T__OPCODE__OP_PUT+1;
+                msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
+                msg->op_n=r;
+            } else if (r == -2) {
+                msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
+                msg->c_type=MESSAGE_T__C_TYPE__CT_NONE;
+                msg->op_n=r;
+            }
             return 0;
         }
         // so compiler doesn't scream at us

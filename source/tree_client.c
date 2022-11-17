@@ -56,10 +56,10 @@ int main(int argc, char *argv[]) {
             int r = rtree_put(rtree, e);
             entry_destroy(e);
 
-            if (r == 0) { 
-                printf("Entry added to tree\n"); 
+            if (r > 0) { 
+                printf("Created request on server with number: %i\n", r); 
             } else {
-                printf("Error on put\n"); 
+                printf("Error on creating server request\n"); 
             }
 
         // GET -----------------------------------------------------
@@ -92,10 +92,11 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             
-            if(rtree_del(rtree, key) == 0) {
-                printf("Deleted entry for key: %s \n", key);
+            int r = rtree_del(rtree, key);
+            if(r > 0) {
+                printf("Created request on server with number: %i\n", r);
             }else {
-              printf("Key not found or error on delete\n");
+              printf("Error on creating server request\n");
             }
 
         // SIZE ---------------------------------------------------
@@ -190,14 +191,18 @@ int main(int argc, char *argv[]) {
 
             int i_op_n;
             sscanf(op_n, "%d", &i_op_n);
-            int exist = rtree_verify(rtree, i_op_n);
+            int r = rtree_verify(rtree, i_op_n);
 
-            if (exist == -1) {
-                perror("Error on size\n");
+            if (r == -1) {
+                perror("Error receiving message\n");
                 exit(-1);
+            } else if (r == 1) {
+                printf("Request is currently being processed\n");
+            } else if ( r == 0) {
+                printf("Request has been processed sucessfully!\n");
+            } else if (r == -2) {
+                printf("Request doesn't exist yet\n");
             }
-            printf("Operation is currently %i\n", exist);
-        
         } else {
             printf("That command doesn't exist.\n");
         }

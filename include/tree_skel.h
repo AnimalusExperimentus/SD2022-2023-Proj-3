@@ -13,7 +13,9 @@
 
 /* Inicia o skeleton da árvore.
  * O main() do servidor deve chamar esta função antes de poder usar a
- * função invoke(). 
+ * função invoke().
+ * A funcao deve lancar N threads secundarias responsaveis por atender
+ * pedidos de escrita na arvore;
  * Retorna 0 (OK) ou -1 (erro, por exemplo OUT OF MEMORY)
  */
 int tree_skel_init(int N);
