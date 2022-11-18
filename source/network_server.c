@@ -15,7 +15,7 @@
 #include "../include/network-private.h"
 
 #define SIZE_CLIENT_DEFAULT 1024
-#define NFDESC 1024 // accept atmost NFDESC clients at the same time
+#define NFDESC 8 // accept atmost NFDESC clients at the same time
 #define TIMEOUT 50 
 
 int sckt;

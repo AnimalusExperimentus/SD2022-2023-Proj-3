@@ -90,35 +90,27 @@ void *process_request (void *params) {
     while (true) {
         
         request = queue_get_request();
+        int op_n = request->op_n;
+        // different threads can't touch eachother's
+        // in_progress value, no lock needed
+        proc_op->in_progress[thread_n] = op_n;
 
-        pthread_mutex_lock(&op_proc_lock);
-        for (int i = 0; i < thread_num; i++) {
-            if (proc_op->in_progress[i] == 0) {
-                proc_op->in_progress[i] = request->op_n;
-            }
-        }
-        pthread_mutex_lock(&op_proc_lock);
-
-        // tree modification
+        // update tree
         pthread_mutex_lock(&tree_lock);
         if (request->op == 0) {
             tree_del(tree, request->key);
         } else {
             tree_put(tree, request->key, request->data);
         }
-        pthread_mutex_lock(&tree_lock);
+        pthread_mutex_unlock(&tree_lock);
 
-
+        // update proc_op
+        proc_op->in_progress[thread_n] = 0;
         pthread_mutex_lock(&op_proc_lock);
-        if (proc_op->max_proc < request->op_n) {
-            proc_op->max_proc = request->op_n;
+        if (proc_op->max_proc < op_n) {
+            proc_op->max_proc = op_n;
         }
-        for (int i = 0; i < thread_num; i++) {
-            if (proc_op->in_progress[i] == request->op_n) {
-                proc_op->in_progress[i] = 0;
-            }
-        }
-        pthread_mutex_lock(&op_proc_lock);
+        pthread_mutex_unlock(&op_proc_lock);
     }
     return NULL;
 }
@@ -127,17 +119,14 @@ void *process_request (void *params) {
 /* Verifica se a operacao identificada por op_n foi executada.
 */
 int verify(int op_n){
-        pthread_mutex_lock(&queue_lock);
+
     if (op_n <= proc_op->max_proc) { return 0; } 
     for (int i = 0; i < thread_num; i++)
     {
         if (proc_op->in_progress[i] == op_n) { 
-            pthread_mutex_unlock(&queue_lock);
             return 1; 
             }
     }
-
-    pthread_mutex_unlock(&queue_lock);
     return -2;       
 }
 
@@ -230,7 +219,7 @@ int invoke(MessageT *msg) {
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
             pthread_mutex_lock(&tree_lock);
             msg->size=tree_size(tree);
-            pthread_mutex_lock(&tree_lock);
+            pthread_mutex_unlock(&tree_lock);
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_HEIGHT:
@@ -239,7 +228,7 @@ int invoke(MessageT *msg) {
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
             pthread_mutex_lock(&tree_lock);
             msg->size=tree_height(tree);
-            pthread_mutex_lock(&tree_lock);
+            pthread_mutex_unlock(&tree_lock);
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_DEL:
@@ -271,7 +260,7 @@ int invoke(MessageT *msg) {
 
             pthread_mutex_lock(&tree_lock);
             struct data_t *t = tree_get(tree, key);
-            pthread_mutex_lock(&tree_lock);
+            pthread_mutex_unlock(&tree_lock);
 
             free(key);
 
@@ -320,7 +309,7 @@ int invoke(MessageT *msg) {
         {
             pthread_mutex_lock(&tree_lock);
             char** kk = tree_get_keys(tree);
-            pthread_mutex_lock(&tree_lock);
+            pthread_mutex_unlock(&tree_lock);
 
             if(kk != NULL){
                 msg->opcode=MESSAGE_T__OPCODE__OP_GETKEYS+1;
@@ -344,7 +333,7 @@ int invoke(MessageT *msg) {
         {
             pthread_mutex_lock(&tree_lock);
             void **val = tree_get_values(tree);
-            pthread_mutex_lock(&tree_lock);
+            pthread_mutex_unlock(&tree_lock);
 
             if (val != NULL) {
                 msg->opcode=MESSAGE_T__OPCODE__OP_GETVALUES+1;
