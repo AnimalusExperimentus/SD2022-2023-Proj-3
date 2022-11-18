@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdbool.h>
 #include "../include/sdmessage.pb-c.h"
 #include "../include/tree.h"
 #include "../include/tree_skel.h"
@@ -82,21 +83,65 @@ struct request_t *queue_get_request() {
 /* Funcao da thread secundaria que vai processar pedidos de escrita
 */
 void *process_request (void *params) {
-    // TODO
-    return NULL;
+    struct request_t *request;
+    while(true){
+        request=queue_get_request();
+
+        pthread_mutex_lock(&queue_lock);
+        
+        for(int i=0;i<thread_num;i++){
+            if(proc_op->in_progress[i]==0){
+                proc_op->in_progress[i]=request->op_n;
+            }
+
+
+        }
+
+
+        if(request->op==0){
+                tree_del(tree,request->key);
+        }else{
+                tree_put(tree,request->key,request->data);
+        }
+
+
+        if(proc_op->max_proc<request->op_n){
+                    proc_op->max_proc=request->op_n;
+                }
+
+                 for(int i=0;i<thread_num;i++){
+                    if(proc_op->in_progress[i]==request->op_n){
+                        proc_op->in_progress[i]=0;
+                    }
+        }
+
+        pthread_mutex_unlock(&queue_lock);
+
+
+    }
+
+
+
+
+    
 }
 
 
 /* Verifica se a operacao identificada por op_n foi executada.
 */
-int verify(int op_n) {
-
+int verify(int op_n){
+        pthread_mutex_lock(&queue_lock);
     if (op_n <= proc_op->max_proc) { return 0; } 
     for (int i = 0; i < thread_num; i++)
     {
-        if (proc_op->in_progress[i] == op_n) { return 1; }
+        if (proc_op->in_progress[i] == op_n) { 
+            pthread_mutex_unlock(&queue_lock);
+            return 1; 
+            }
     }
-    return -2;
+
+    pthread_mutex_unlock(&queue_lock);
+    return -2;       
 }
 
 
@@ -151,6 +196,13 @@ void tree_skel_destroy() {
         tree_destroy(tree);
     }
 
+    if(proc_op!=NULL){
+        if(proc_op->in_progress!=NULL){
+        free(proc_op->in_progress);
+        }
+        free(proc_op);
+    }
+
     if(queue_head != NULL) {
         while(queue_head->next != NULL) {
             free(queue_head->key);
@@ -177,14 +229,20 @@ int invoke(MessageT *msg) {
         {
             msg->opcode=MESSAGE_T__OPCODE__OP_SIZE+1;
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
-            msg->size=tree_size(tree);
+            pthread_mutex_lock(&queue_lock);
+             msg->size=tree_size(tree);
+            pthread_mutex_unlock(&queue_lock);
+           
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_HEIGHT:
         {
             msg->opcode=MESSAGE_T__OPCODE__OP_HEIGHT+1;
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
-            msg->size=tree_height(tree);
+            pthread_mutex_lock(&queue_lock);
+             msg->size=tree_height(tree);
+            pthread_mutex_unlock(&queue_lock);
+           
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_DEL:
@@ -213,8 +271,11 @@ int invoke(MessageT *msg) {
             char *key = malloc(msg->size);
             memset(key, '\0', msg->size);
             memcpy(key, msg->key, msg->size);
-
+            
+            pthread_mutex_lock(&queue_lock);
             struct data_t *t = tree_get(tree, key);
+            pthread_mutex_unlock(&queue_lock);
+            
             free(key);
 
             if(t == NULL) {
@@ -260,7 +321,11 @@ int invoke(MessageT *msg) {
         }
         case MESSAGE_T__OPCODE__OP_GETKEYS:
         {
-            char** kk = tree_get_keys(tree);
+
+            pthread_mutex_lock(&queue_lock);
+             char** kk = tree_get_keys(tree);
+            pthread_mutex_unlock(&queue_lock);
+           
 
             if(kk != NULL){
                 msg->opcode=MESSAGE_T__OPCODE__OP_GETKEYS+1;
@@ -282,7 +347,11 @@ int invoke(MessageT *msg) {
         }
         case MESSAGE_T__OPCODE__OP_GETVALUES:
         {
+
+            pthread_mutex_lock(&queue_lock);
             void **val = tree_get_values(tree);
+            pthread_mutex_unlock(&queue_lock);
+           
 
             if (val != NULL) {
                 msg->opcode=MESSAGE_T__OPCODE__OP_GETVALUES+1;
