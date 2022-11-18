@@ -126,14 +126,19 @@ void *process_request (void *params) {
 
 /* Verifica se a operacao identificada por op_n foi executada.
 */
-int verify(int op_n) {
-
+int verify(int op_n){
+        pthread_mutex_lock(&queue_lock);
     if (op_n <= proc_op->max_proc) { return 0; } 
     for (int i = 0; i < thread_num; i++)
     {
-        if (proc_op->in_progress[i] == op_n) { return 1; }
+        if (proc_op->in_progress[i] == op_n) { 
+            pthread_mutex_unlock(&queue_lock);
+            return 1; 
+            }
     }
-    return -2;
+
+    pthread_mutex_unlock(&queue_lock);
+    return -2;       
 }
 
 
