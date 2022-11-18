@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
             } else if ( r == 0) {
                 printf("Request has been processed sucessfully!\n");
             } else if (r == -2) {
-                printf("Request doesn't exist yet\n");
+                printf("Request is still in queue\n");
             }
         } else {
             printf("That command doesn't exist.\n");

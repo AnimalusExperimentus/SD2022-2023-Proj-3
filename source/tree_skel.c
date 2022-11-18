@@ -7,8 +7,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "../include/sdmessage.pb-c.h"
 #include "../include/tree.h"
 #include "../include/tree_skel.h"
@@ -33,8 +35,6 @@ struct request_t {
 struct request_t *queue_head;
 
 struct tree_t *tree;
-// sempre que eh recebido pedido de escrita o main thread responde com o valor atual de
-// last_assigned e de seguida incrementa-o
 int last_assigned = 1;
 
 pthread_t *threads;
@@ -42,23 +42,24 @@ int *thread_params;
 int thread_num;
 pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER; 
 pthread_cond_t queue_not_empty = PTHREAD_COND_INITIALIZER;
-
+pthread_mutex_t tree_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t op_proc_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /**/
 void queue_add_request(struct request_t *request) {
 
     pthread_mutex_lock(&queue_lock);
     request->next = NULL;
-    // adds to head of FIFO
     if(queue_head == NULL) {
+        // adds to head of FIFO
         queue_head = request;
-    // adds to end of FIFO
     } else { 
+        // adds to end of FIFO
         struct request_t *tptr = queue_head;
         while(tptr->next != NULL) {tptr = tptr->next;}
         tptr->next = request;
     }
-    pthread_cond_signal(&queue_not_empty);
+    pthread_cond_broadcast(&queue_not_empty);
     pthread_mutex_unlock(&queue_lock);
 }
 
@@ -67,8 +68,7 @@ void queue_add_request(struct request_t *request) {
 struct request_t *queue_get_request() {
 
     pthread_mutex_lock(&queue_lock);
-    while(queue_head == NULL) {
-        // wait for something
+    while (queue_head == NULL) {
         pthread_cond_wait(&queue_not_empty, &queue_lock);
     }
     struct request_t *request = queue_head;
@@ -82,7 +82,44 @@ struct request_t *queue_get_request() {
 /* Funcao da thread secundaria que vai processar pedidos de escrita
 */
 void *process_request (void *params) {
-    // TODO
+
+    int thread_n = *((int*)params);
+    printf("This is thread number %i\n", thread_n);
+
+    struct request_t *request;
+    while (true) {
+        
+        request = queue_get_request();
+
+        pthread_mutex_lock(&op_proc_lock);
+        for (int i = 0; i < thread_num; i++) {
+            if (proc_op->in_progress[i] == 0) {
+                proc_op->in_progress[i] = request->op_n;
+            }
+        }
+        pthread_mutex_lock(&op_proc_lock);
+
+        // tree modification
+        pthread_mutex_lock(&tree_lock);
+        if (request->op == 0) {
+            tree_del(tree, request->key);
+        } else {
+            tree_put(tree, request->key, request->data);
+        }
+        pthread_mutex_lock(&tree_lock);
+
+
+        pthread_mutex_lock(&op_proc_lock);
+        if (proc_op->max_proc < request->op_n) {
+            proc_op->max_proc = request->op_n;
+        }
+        for (int i = 0; i < thread_num; i++) {
+            if (proc_op->in_progress[i] == request->op_n) {
+                proc_op->in_progress[i] = 0;
+            }
+        }
+        pthread_mutex_lock(&op_proc_lock);
+    }
     return NULL;
 }
 
@@ -119,7 +156,6 @@ int tree_skel_init(int N) {
     proc_op = malloc(sizeof(struct op_proc));
     proc_op->in_progress = malloc((sizeof(int))*N);
     if (proc_op == NULL) {
-        free(proc_op->in_progress);
         free(proc_op);
         return(-1);
     }
@@ -131,8 +167,8 @@ int tree_skel_init(int N) {
     thread_params = malloc(sizeof(int)*N);
 
     // create threads
-    for (int i=  0; i < N; i++){
-		thread_params[i] = (i+1);
+    for (int i = 0; i < N; i++){
+		thread_params[i] = i;
 		if (pthread_create(&threads[i], NULL, &process_request, (void *) &thread_params[i]) != 0) {
 			printf("Erro na criacao da thread %d.\n", i);
 			return(-1);
@@ -145,12 +181,22 @@ int tree_skel_init(int N) {
 /* Liberta toda a memória e recursos alocados pela função tree_skel_init.
  */
 void tree_skel_destroy() {
-    struct request_t *req;
     
-    if(tree != NULL) {
-        tree_destroy(tree);
+    // wait until all requests have been processed
+    while (queue_head != NULL) { sleep(1); }
+    // we can force close threads safely now
+    for (int i = 0; i < thread_num; i++) {
+        pthread_cancel(threads[i]);
     }
+    printf("\nClosed all threads\n");
+    free(threads); free(thread_params);
+    // free tree
+    if(tree != NULL) { tree_destroy(tree); }
+    //free proc_op
+    free(proc_op->in_progress); free(proc_op);
 
+    // free request queue
+    struct request_t *req;
     if(queue_head != NULL) {
         while(queue_head->next != NULL) {
             free(queue_head->key);
@@ -177,14 +223,18 @@ int invoke(MessageT *msg) {
         {
             msg->opcode=MESSAGE_T__OPCODE__OP_SIZE+1;
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
+            pthread_mutex_lock(&tree_lock);
             msg->size=tree_size(tree);
+            pthread_mutex_lock(&tree_lock);
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_HEIGHT:
         {
             msg->opcode=MESSAGE_T__OPCODE__OP_HEIGHT+1;
             msg->c_type=MESSAGE_T__C_TYPE__CT_RESULT;
+            pthread_mutex_lock(&tree_lock);
             msg->size=tree_height(tree);
+            pthread_mutex_lock(&tree_lock);
             return 0;
         }
         case MESSAGE_T__OPCODE__OP_DEL:
@@ -214,7 +264,10 @@ int invoke(MessageT *msg) {
             memset(key, '\0', msg->size);
             memcpy(key, msg->key, msg->size);
 
+            pthread_mutex_lock(&tree_lock);
             struct data_t *t = tree_get(tree, key);
+            pthread_mutex_lock(&tree_lock);
+
             free(key);
 
             if(t == NULL) {
@@ -260,7 +313,9 @@ int invoke(MessageT *msg) {
         }
         case MESSAGE_T__OPCODE__OP_GETKEYS:
         {
+            pthread_mutex_lock(&tree_lock);
             char** kk = tree_get_keys(tree);
+            pthread_mutex_lock(&tree_lock);
 
             if(kk != NULL){
                 msg->opcode=MESSAGE_T__OPCODE__OP_GETKEYS+1;
@@ -282,7 +337,9 @@ int invoke(MessageT *msg) {
         }
         case MESSAGE_T__OPCODE__OP_GETVALUES:
         {
+            pthread_mutex_lock(&tree_lock);
             void **val = tree_get_values(tree);
+            pthread_mutex_lock(&tree_lock);
 
             if (val != NULL) {
                 msg->opcode=MESSAGE_T__OPCODE__OP_GETVALUES+1;
@@ -331,19 +388,9 @@ int invoke(MessageT *msg) {
             return 0;
         }
         // so compiler doesn't scream at us
-        case MESSAGE_T__OPCODE__OP_BAD:
-        {
-            return 0;
-        }
-        case MESSAGE_T__OPCODE__OP_ERROR:
-        {
-            return 0;
-        }
-        case _MESSAGE_T__OPCODE_IS_INT_SIZE:
-        {
-            return 0;
-        }
-
+        case MESSAGE_T__OPCODE__OP_BAD: { return 0; }
+        case MESSAGE_T__OPCODE__OP_ERROR: { return 0; }
+        case _MESSAGE_T__OPCODE_IS_INT_SIZE: { return 0; }
     }
     return -1;
 }

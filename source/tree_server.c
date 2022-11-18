@@ -43,5 +43,6 @@ int main(int argc, char *argv[]) {
     int result = network_main_loop(listening_socket);
     
     tree_skel_destroy();
+    printf("Exiting...\n");
     exit(result);
 }

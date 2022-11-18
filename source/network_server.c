@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <poll.h>
+#include <signal.h>
 #include "../include/tree_skel.h"
 #include "../include/network-private.h"
 
@@ -18,6 +19,7 @@
 #define TIMEOUT 50 
 
 int sckt;
+static volatile int keep_t_running = 1;
 
 /* Função para preparar uma socket de receção de pedidos de ligação
  * num determinado porto.
@@ -159,6 +161,11 @@ int get_nfds(struct pollfd *connections) {
     return -1;
 }
 
+/* Aux function*/
+void int_handler(int dummy) {
+    keep_t_running = 0;
+}
+
 
 /* Esta função deve:
  * - Aceitar uma conexão de um cliente;
@@ -168,6 +175,8 @@ int get_nfds(struct pollfd *connections) {
  * - Enviar a resposta ao cliente usando a função network_send.
  */
 int network_main_loop(int listening_socket) {
+
+    signal(SIGINT, int_handler);
     struct sockaddr client;
     socklen_t size_client = SIZE_CLIENT_DEFAULT;
     struct pollfd connections[NFDESC];
@@ -189,7 +198,7 @@ int network_main_loop(int listening_socket) {
     nfds = 1;
 
     // wait for data on open sockets
-    while ( (kfds = poll(connections, NFDESC, TIMEOUT)) >= 0) {
+    while ( (kfds = poll(connections, NFDESC, TIMEOUT)) >= 0 && keep_t_running) {
     if (kfds > 0) {
 
         // Do we have a new connection request
@@ -236,6 +245,11 @@ int network_main_loop(int listening_socket) {
         // update nfds if max nr clients reached
         if (nfds == -1) { nfds = get_nfds(connections); }
     }}
-    printf("return: %i\n", kfds);
+
+    // close all sockets
+    for (int i = 0; i < NFDESC; i++) {
+        if (connections[i].fd != -1) { close(connections[i].fd); }
+    }
+    
     return 0;
 }
