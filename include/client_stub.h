@@ -64,7 +64,6 @@ void **rtree_get_values(struct rtree_t *rtree);
 
 /*  Verifica se a operação op_n foi executada
  */
-
 int rtree_verify(struct rtree_t *rtree,int op_n);
 
 

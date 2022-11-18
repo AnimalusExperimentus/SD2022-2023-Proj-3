@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
                 printf("Value found for this key: %.*s\n", d->datasize, (char*)d->data);
             }
 
-        // DEL-----------------------------------------------------
+        // DEL -----------------------------------------------------
         } else if (strcmp(command, "del") == 0) {
             char* key = strtok(NULL, " \n");
             if (key == NULL || strtok(NULL, " ") != NULL){
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
             } else if ( r == 0) {
                 printf("Request has been processed sucessfully!\n");
             } else if (r == -2) {
-                printf("Request is still in queue\n");
+                printf("Request is still in the queue or doesn't exist\n");
             }
         } else {
             printf("That command doesn't exist.\n");

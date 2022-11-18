@@ -18,10 +18,8 @@
 #include "../include/entry.h"
 
 struct op_proc {
-    // maior identificador de ops de escrita ja concluidas
-    int max_proc;
-    // ops de escrita a serem atendidas pelos threads neste momento
-    int *in_progress;
+    int max_proc; // maior identificador de ops de escrita ja concluidas
+    int *in_progress; // ops de escrita a serem atendidas pelos threads neste momento
 };
 struct op_proc *proc_op;
 
@@ -97,7 +95,7 @@ void *process_request (void *params) {
         request = queue_get_request();
         if (request == NULL) { break; } // ctrl^c
         int op_n = request->op_n;
-        // different threads can't touch eachother's
+        // different threads don't touch/check eachother's
         // in_progress value, no lock needed
         proc_op->in_progress[thread_n] = op_n;
 

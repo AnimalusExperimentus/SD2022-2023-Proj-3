@@ -19,7 +19,7 @@
 #define TIMEOUT 50 
 
 int sckt;
-static volatile int keep_t_running = 1;
+static volatile int keep_running = 1;
 
 /* Função para preparar uma socket de receção de pedidos de ligação
  * num determinado porto.
@@ -163,7 +163,7 @@ int get_nfds(struct pollfd *connections) {
 
 /* Aux function*/
 void int_handler(int dummy) {
-    keep_t_running = 0;
+    keep_running = 0;
 }
 
 
@@ -201,7 +201,7 @@ int network_main_loop(int listening_socket) {
     nfds = 1;
 
     // wait for data on open sockets
-    while ( (kfds = poll(connections, NFDESC, TIMEOUT)) >= 0 && keep_t_running) {
+    while ( (kfds = poll(connections, NFDESC, TIMEOUT)) >= 0 && keep_running) {
     if (kfds > 0) {
 
         // Do we have a new connection request
