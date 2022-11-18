@@ -3,6 +3,7 @@
         "request.h": "c",
         "network-private.h": "c",
         "request_line.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "entry.h": "c"
     }
 }

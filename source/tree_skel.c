@@ -14,22 +14,12 @@
 #include "../include/sdmessage.pb-c.h"
 #include "../include/tree.h"
 #include "../include/tree_skel.h"
+#include "../include/tree_skel_private.h"
 #include "../include/data.h"
 #include "../include/entry.h"
 
-struct op_proc {
-    int max_proc; // maior identificador de ops de escrita ja concluidas
-    int *in_progress; // ops de escrita a serem atendidas pelos threads neste momento
-};
-struct op_proc *proc_op;
 
-struct request_t {
-    int op_n;            //o número da operação
-    int op;              //a operação a executar. op=0 se for um delete, op=1 se for um put
-    char* key;           //a chave a remover ou adicionar
-    struct data_t *data; // os dados a adicionar em caso de put, ou NULL em caso de delete
-    struct request_t *next;
-};
+struct op_proc *proc_op;
 struct request_t *queue_head;
 
 struct tree_t *tree;
