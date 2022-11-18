@@ -111,6 +111,11 @@ void *process_request (void *params) {
             proc_op->max_proc = op_n;
         }
         pthread_mutex_unlock(&op_proc_lock);
+
+        // free request
+        free(request->key);
+        if (request->op == 1)
+            data_destroy(request->data);
     }
     return NULL;
 }
@@ -125,7 +130,7 @@ int verify(int op_n){
     {
         if (proc_op->in_progress[i] == op_n) { 
             return 1; 
-            }
+        }
     }
     return -2;       
 }
