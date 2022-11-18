@@ -122,7 +122,7 @@ int network_send(int client_socket, MessageT *msg) {
     unsigned len = message_t__get_packed_size(msg);
     void *buf = malloc(len);
     message_t__pack(msg, buf);
-    free(msg);
+    message_t__free_unpacked(msg, NULL);
 
     // send message size first
     write(client_socket, &len, sizeof(unsigned));
@@ -188,7 +188,10 @@ int network_main_loop(int listening_socket) {
     }
 
     // make poll ignore other sockets
-    for (int i = 1; i < NFDESC; i++) { connections[i].fd = -1; }
+    for (int i = 1; i < NFDESC; i++) { 
+        connections[i].fd = -1;
+        connections[i].events = 0;
+    }
 
     // init welcoming socket for poll
     connections[0].fd = listening_socket;

@@ -36,6 +36,7 @@ struct request_t *queue_head;
 
 struct tree_t *tree;
 int last_assigned = 1;
+int keep_t_running = 1;
 
 pthread_t *threads;
 int *thread_params;
@@ -68,8 +69,12 @@ void queue_add_request(struct request_t *request) {
 struct request_t *queue_get_request() {
 
     pthread_mutex_lock(&queue_lock);
-    while (queue_head == NULL) {
+    while (queue_head == NULL && keep_t_running) {
         pthread_cond_wait(&queue_not_empty, &queue_lock);
+    }
+    if (!keep_t_running) { // ctrl^c
+        pthread_mutex_unlock(&queue_lock);
+        return NULL;
     }
     struct request_t *request = queue_head;
     queue_head = request->next;
@@ -83,13 +88,14 @@ struct request_t *queue_get_request() {
 */
 void *process_request (void *params) {
 
+    // pthread_detach(pthread_self());
     int thread_n = *((int*)params);
-    printf("This is thread number %i\n", thread_n);
 
     struct request_t *request;
     while (true) {
         
         request = queue_get_request();
+        if (request == NULL) { break; } // ctrl^c
         int op_n = request->op_n;
         // different threads can't touch eachother's
         // in_progress value, no lock needed
@@ -116,15 +122,23 @@ void *process_request (void *params) {
         free(request->key);
         if (request->op == 1)
             data_destroy(request->data);
+        free(request);
     }
+
+    // Signal next thread to exit
+    pthread_cond_signal(&queue_not_empty);
     return NULL;
 }
 
 
 /* Verifica se a operacao identificada por op_n foi executada.
 */
-int verify(int op_n){
+int verify(int op_n) {
 
+    // the main thread can read at any time without
+    // compromising the integrity, worse that can happen
+    // is client gets outdated answer on the status
+    // but on resending will get correct one
     if (op_n <= proc_op->max_proc) { return 0; } 
     for (int i = 0; i < thread_num; i++)
     {
@@ -144,6 +158,7 @@ int verify(int op_n){
  * Retorna 0 (OK) ou -1 (erro, por exemplo OUT OF MEMORY)
  */
 int tree_skel_init(int N) {
+
     thread_num = N;
     
     tree = tree_create();
@@ -183,9 +198,11 @@ void tree_skel_destroy() {
     
     // wait until all requests have been processed
     while (queue_head != NULL) { sleep(1); }
-    // we can force close threads safely now
+    // we can join threads safely now
+    keep_t_running = 0;
+    pthread_cond_signal(&queue_not_empty);
     for (int i = 0; i < thread_num; i++) {
-        pthread_cancel(threads[i]);
+        pthread_join(threads[i], NULL);
     }
     printf("\nClosed all threads\n");
     free(threads); free(thread_params);
@@ -198,13 +215,13 @@ void tree_skel_destroy() {
     struct request_t *req;
     if(queue_head != NULL) {
         while(queue_head->next != NULL) {
+            req=queue_head->next;
             free(queue_head->key);
             data_destroy(queue_head->data);
             free(queue_head);
-            req=queue_head->next;
-            free(queue_head);
             queue_head=req;
         }
+        free(queue_head);
     }
 }
 
@@ -267,8 +284,6 @@ int invoke(MessageT *msg) {
             struct data_t *t = tree_get(tree, key);
             pthread_mutex_unlock(&tree_lock);
 
-            free(key);
-
             if(t == NULL) {
                 msg->opcode=MESSAGE_T__OPCODE__OP_GET+1;
                 msg->c_type=MESSAGE_T__C_TYPE__CT_VALUE;
@@ -284,6 +299,7 @@ int invoke(MessageT *msg) {
                 msg->size = t->datasize;
                 memcpy(msg->data.data, t->data, msg->size);
             }
+            free(key);
             data_destroy(t);
             return 0;
         }
@@ -364,7 +380,9 @@ int invoke(MessageT *msg) {
                     v->data.data = malloc(d->datasize);
                     v->data.data = memcpy(v->data.data, d->data, d->datasize);
                     msg->vals[i] = v;
+                    data_destroy(d);
                 }
+                free(val);
 
             } else {
                 msg->opcode=MESSAGE_T__OPCODE__OP_ERROR;
